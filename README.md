@@ -13,7 +13,7 @@ Test repository for real-time implementation
 
 **Requires replacing qartod.py in the ioos_qc package with ./ioos_qc_mods/qartod.py. Need to add this step**
 
-## Steps
+## Usage
 
 `python run_glider_qc.py glider-YYYYmmddTHHMM`
 
