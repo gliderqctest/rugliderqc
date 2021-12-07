@@ -15,7 +15,7 @@ Test repository for real-time implementation
 
 ## Steps
 
-'python run_glider_qc.py glider-YYYYmmddTHHMM'
+`python run_glider_qc.py glider-YYYYmmddTHHMM`
 
 This wrapper script runs:
 
