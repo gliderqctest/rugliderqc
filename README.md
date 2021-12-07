@@ -15,8 +15,12 @@ Test repository for real-time implementation
 
 ## Steps
 
+'python run_glider_qc.py glider-YYYYmmddTHHMM'
+
+This wrapper script runs:
+
 1. check_duplicate_timestamps.py
-2. glider_qartod_qc.py
-3. bad_ctd_profiles-test.py
-4. summarize_qc_flags - not written yet
+2. qartod_qc.py
+3. ctd_hysteresis_test.py
+4. <summarize_qc_flags - not written yet>
 5. move_nc_files.py
