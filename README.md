@@ -24,3 +24,7 @@ This wrapper script runs:
 3. ctd_hysteresis_test.py
 4. <summarize_qc_flags - not written yet>
 5. move_nc_files.py
+
+## Acknowledgements
+
+Development was supported in part by the [Mid-Atlantic Regional Association Coastal Ocean Observing System](https://maracoos.org/).
