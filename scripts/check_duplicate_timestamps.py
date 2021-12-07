@@ -11,11 +11,10 @@ import os
 import logging
 import argparse
 import sys
-import pytz
-from dateutil import parser
 import glob
 import numpy as np
 import xarray as xr
+from rugliderqc.common import find_glider_deployment_datapath
 
 
 def main(args):
@@ -50,40 +49,10 @@ def main(args):
     for deployment in args.deployments:
     #for deployment in [deployments]:
 
-        logging.info('Checking deployment {:s}'.format(deployment))
+        data_path = find_glider_deployment_datapath(logging, deployment, data_home, dataset_type, cdm_data_type, mode)
 
-        try:
-            (glider, trajectory) = deployment.split('-')
-        except ValueError as e:
-            logging.error('Error parsing invalid deployment name {:s}: {:}'.format(deployment, e))
-            status = 1
-            continue
-
-        try:
-            trajectory_dt = parser.parse(trajectory).replace(tzinfo=pytz.UTC)
-        except ValueError as e:
-            logging.error('Error parsing trajectory date {:s}: {:}'.format(trajectory, e))
-            status = 1
-            continue
-
-        trajectory = '{:s}-{:s}'.format(glider, trajectory_dt.strftime('%Y%m%dT%H%M'))
-        deployment_name = os.path.join('{:0.0f}'.format(trajectory_dt.year), trajectory)
-
-        # Create fully-qualified path to the deployment location
-        deployment_location = os.path.join(data_home, 'deployments', deployment_name)
-        logging.info('Deployment location: {:s}'.format(deployment_location))
-        if not os.path.isdir(deployment_location):
-            logging.warning('Deployment location does not exist: {:s}'.format(deployment_location))
-            status = 1
-            continue
-
-        # Set the deployment netcdf data path
-        data_path = os.path.join(deployment_location, 'data', 'out', 'nc',
-                                 '{:s}-{:s}/{:s}'.format(dataset_type, cdm_data_type, mode))
-
-        if not os.path.isdir(data_path):
-            logging.warning('{:s} data directory not found: {:s}'.format(trajectory, data_path))
-            status = 1
+        if not data_path:
+            logging.error('{:s} data directory not found:'.format(deployment))
             continue
 
         # List the netcdf files in queue
@@ -139,13 +108,13 @@ def main(args):
             else:
                 continue
 
-    logging.info(' {:} duplicated files found (of {:} total files)'.format(duplicates, len(ncfiles)))
+        logging.info(' {:} duplicated files found (of {:} total files)'.format(duplicates, len(ncfiles)))
     return status
 
 
 if __name__ == '__main__':
     # deploy = 'ru30-20210503T1929'  # maracoos_02-20210716T1814 ru34-20200729T1430 ru33-20201014T1746 ru33-20200715T1558  ru32-20190102T1317 ru30-20210503T1929
-    # mode = 'delayed'
+    # mode = 'rt'
     # d = 'profile'
     # ll = 'info'
     # level = 'sci'

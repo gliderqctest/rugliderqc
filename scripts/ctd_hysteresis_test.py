@@ -11,8 +11,6 @@ import os
 import logging
 import argparse
 import sys
-import pytz
-from dateutil import parser
 import glob
 import numpy as np
 import xarray as xr
@@ -20,6 +18,7 @@ from shapely.geometry import Polygon, MultiPolygon
 from shapely.ops import polygonize
 from ioos_qc import qartod
 from ioos_qc.utils import load_config_as_dict as loadconfig
+from rugliderqc.common import find_glider_deployment_datapath
 np.set_printoptions(suppress=True)
 
 
@@ -132,38 +131,17 @@ def main(args):
     for deployment in args.deployments:
     # for deployment in [deployments]:
 
-        logging.info('Checking deployment {:s}'.format(deployment))
+        data_path = find_glider_deployment_datapath(logging, deployment, data_home, dataset_type, cdm_data_type, mode)
 
-        try:
-            (glider, trajectory) = deployment.split('-')
-        except ValueError as e:
-            logging.error('Error parsing invalid deployment name {:s}: {:}'.format(deployment, e))
-            status = 1
-            continue
-
-        try:
-            trajectory_dt = parser.parse(trajectory).replace(tzinfo=pytz.UTC)
-        except ValueError as e:
-            logging.error('Error parsing trajectory date {:s}: {:}'.format(trajectory, e))
-            status = 1
-            continue
-
-        trajectory = '{:s}-{:s}'.format(glider, trajectory_dt.strftime('%Y%m%dT%H%M'))
-        deployment_name = os.path.join('{:0.0f}'.format(trajectory_dt.year), trajectory)
-
-        # Create fully-qualified path to the deployment location
-        deployment_location = os.path.join(data_home, 'deployments', deployment_name)
-        logging.info('Deployment location: {:s}'.format(deployment_location))
-        if not os.path.isdir(deployment_location):
-            logging.warning('Deployment location does not exist: {:s}'.format(deployment_location))
-            status = 1
+        if not data_path:
+            logging.error('{:s} data directory not found:'.format(deployment))
             continue
 
         # Set the deployment qc configuration path
+        deployment_location = data_path.split('/data')[0]
         deployment_qc_config_root = os.path.join(deployment_location, 'config', 'qc')
-        if not os.path.isdir(qc_config_root):
+        if not os.path.isdir(deployment_qc_config_root):
             logging.warning('Invalid deployment QC config root: {:s}'.format(deployment_qc_config_root))
-            return 1
 
         # Get the test thresholds from the config file for the deployment (if available) or the default
         config_file = os.path.join(deployment_qc_config_root, 'ctd_hysteresis.yml')
@@ -178,15 +156,6 @@ def main(args):
         logging.info('Using config file: {:s}'.format(config_file))
         config_dict = loadconfig(config_file)
         hysteresis_thresholds = config_dict['ctd_hysteresis_test']
-
-        # Set the deployment netcdf data path
-        data_path = os.path.join(deployment_location, 'data', 'out', 'nc',
-                                 '{:s}-{:s}/{:s}'.format(dataset_type, cdm_data_type, mode))
-
-        if not os.path.isdir(data_path):
-            logging.warning('{:s} data directory not found: {:s}'.format(trajectory, data_path))
-            status = 1
-            continue
 
         # List the netcdf files
         ncfiles = sorted(glob.glob(os.path.join(data_path, 'queue', '*.nc')))
