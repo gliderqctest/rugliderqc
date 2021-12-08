@@ -7,61 +7,46 @@ Move quality controlled glider NetCDF files to the final data directory (out of 
 """
 
 import os
-import logging
 import argparse
 import sys
 import glob
 from pathlib import Path
-from rugliderqc.common import find_glider_deployment_datapath
+from rugliderqc.common import find_glider_deployment_datapath, find_glider_deployments_rootdir, initialize_logging
 
 
 def main(args):
 # def main(deployments, mode, cdm_data_type, loglevel, dataset_type):
     status = 0
 
-    # Set up the logger
-    log_level = getattr(logging, args.loglevel.upper())
-    # log_level = getattr(logging, loglevel.upper())
-    log_format = '%(asctime)s%(module)s:%(levelname)s:%(message)s [line %(lineno)d]'
-    logging.basicConfig(format=log_format, level=log_level)
-
+    loglevel = args.loglevel.upper()
     cdm_data_type = args.cdm_data_type
     mode = args.mode
     dataset_type = args.level
+    # loglevel = loglevel.upper()
 
-    # Find the glider deployments root directory
-    data_home = os.getenv('GLIDER_DATA_HOME_TEST')
-    if not data_home:
-        logging.error('GLIDER_DATA_HOME_TEST not set')
-        return 1
-    elif not os.path.isdir(data_home):
-        logging.error('Invalid GLIDER_DATA_HOME_TEST: {:s}'.format(data_home))
-        return 1
+    logging = initialize_logging(loglevel)
 
-    deployments_root = os.path.join(data_home, 'deployments')
-    if not os.path.isdir(deployments_root):
-        logging.warning('Invalid deployments root: {:s}'.format(deployments_root))
-        return 1
-    logging.info('Deployments root: {:s}'.format(deployments_root))
+    data_home, deployments_root = find_glider_deployments_rootdir(logging)
+    if isinstance(deployments_root, str):
 
-    for deployment in args.deployments:
-    # for deployment in [deployments]:
+        for deployment in args.deployments:
+        # for deployment in [deployments]:
 
-        data_path = find_glider_deployment_datapath(logging, deployment, data_home, dataset_type, cdm_data_type, mode)
+            data_path = find_glider_deployment_datapath(logging, deployment, data_home, dataset_type, cdm_data_type, mode)
 
-        if not data_path:
-            logging.error('{:s} data directory not found:'.format(deployment))
-            continue
+            if not data_path:
+                logging.error('{:s} data directory not found:'.format(deployment))
+                continue
 
-        # List the netcdf files in queue
-        ncfiles = sorted(glob.glob(os.path.join(data_path, 'queue', '*.nc')))
+            # List the netcdf files in queue
+            ncfiles = sorted(glob.glob(os.path.join(data_path, 'queue', '*.nc')))
 
-        # Iterate through files and move them to the parent directory
-        for f in ncfiles:
-            p = Path(f).absolute()
-            p.rename(os.path.join(data_path, p.name))
+            # Iterate through files and move them to the parent directory
+            for f in ncfiles:
+                p = Path(f).absolute()
+                p.rename(os.path.join(data_path, p.name))
 
-    return status
+        return status
 
 
 if __name__ == '__main__':

@@ -7,7 +7,6 @@ Run ioos_qc QARTOD tests on processed glider NetCDF files and append the results
 """
 
 import os
-import logging
 import argparse
 import sys
 from datetime import timedelta
@@ -23,7 +22,7 @@ from ioos_qc.results import collect_results
 from ioos_qc.utils import load_config_as_dict as loadconfig
 from shapely.geometry import Point
 from shapely.geometry.polygon import Polygon
-from rugliderqc.common import find_glider_deployment_datapath
+from rugliderqc.common import find_glider_deployment_datapath, find_glider_deployments_rootdir, initialize_logging
 
 
 def build_global_regional_config(ds, qc_config_root):
@@ -130,198 +129,165 @@ def main(args):
 # def main(deployments, mode, cdm_data_type, loglevel, dataset_type):
     status = 0
 
-    # Set up the logger
-    log_level = getattr(logging, args.loglevel.upper())
-    # log_level = getattr(logging, loglevel.upper())
-    log_format = '%(asctime)s%(module)s:%(levelname)s:%(message)s [line %(lineno)d]'
-    logging.basicConfig(format=log_format, level=log_level)
-
+    loglevel = args.loglevel.upper()
     cdm_data_type = args.cdm_data_type
     mode = args.mode
     dataset_type = args.level
+    # loglevel = loglevel.upper()
 
-    # Find the glider deployments root directory
-    data_home = os.getenv('GLIDER_DATA_HOME_TEST')
-    if not data_home:
-        logging.error('GLIDER_DATA_HOME_TEST not set')
-        return 1
-    elif not os.path.isdir(data_home):
-        logging.error('Invalid GLIDER_DATA_HOME_TEST: {:s}'.format(data_home))
-        return 1
+    logging = initialize_logging(loglevel)
 
-    deployments_root = os.path.join(data_home, 'deployments')
-    if not os.path.isdir(deployments_root):
-        logging.warning('Invalid deployments root: {:s}'.format(deployments_root))
-        return 1
-    logging.info('Deployments root: {:s}'.format(deployments_root))
+    data_home, deployments_root = find_glider_deployments_rootdir(logging)
+    if isinstance(deployments_root, str):
 
-    for deployment in args.deployments:
-    # for deployment in [deployments]:
+        for deployment in args.deployments:
+        # for deployment in [deployments]:
 
-        data_path = find_glider_deployment_datapath(logging, deployment, data_home, dataset_type, cdm_data_type, mode)
+            data_path = find_glider_deployment_datapath(logging, deployment, deployments_root, dataset_type, cdm_data_type, mode)
 
-        if not data_path:
-            logging.error('{:s} data directory not found:'.format(deployment))
-            continue
-
-        # List the netcdf files in queue
-        ncfiles = sorted(glob.glob(os.path.join(data_path, 'queue', '*.nc')))
-
-        # Iterate through files and apply QC
-        for f in ncfiles:
-            try:
-                with xr.open_dataset(f) as ds:
-                    ds = ds.load()
-            except OSError as e:
-                logging.error('Error reading file {:s} ({:})'.format(f, e))
-                status = 1
+            if not data_path:
+                logging.error('{:s} data directory not found:'.format(deployment))
                 continue
 
-            # Set the qc configuration path
-            qc_config_root = os.path.join(data_home, 'qc', 'config')
-            if not os.path.isdir(qc_config_root):
-                logging.warning('Invalid QC config root: {:s}'.format(qc_config_root))
-                return 1
+            # List the netcdf files in queue
+            ncfiles = sorted(glob.glob(os.path.join(data_path, 'queue', '*.nc')))
 
-            # run gross and flat line tests
-            # Set the path for the gross range and flat line configuration files
-            qc_config_gross_flatline = os.path.join(qc_config_root, 'gross_flatline')
-
-            # List the instruments in the netcdf file
-            instruments = [x for x in list(ds.data_vars) if 'instrument_' in x]
-
-            for inst in instruments:
-                # Define the instrument make/model
+            # Iterate through files and apply QC
+            for f in ncfiles:
                 try:
-                    model = ds[inst].make_model
-                except AttributeError:
-                    logging.error('Sensor make_model not specified {:s}'.format(inst))
-
-                # Build the configuration filename based on the instrument, make and model
-                qc_config_filename = define_gross_flatline_config(inst, model)
-
-                qc_config_file = os.path.join(qc_config_gross_flatline, qc_config_filename)
-
-                if not os.path.isfile(qc_config_file):
-                    logging.warning('Missing QC configuration file: {:s} {:s}'.format(inst, qc_config_file))
+                    with xr.open_dataset(f) as ds:
+                        ds = ds.load()
+                except OSError as e:
+                    logging.error('Error reading file {:s} ({:})'.format(f, e))
+                    status = 1
                     continue
-                logging.info('QC configuration file: {:s}'.format(qc_config_file))
 
-                # Run ioos_qc gross/flatline tests based on the QC configuration file
-                c = Config(qc_config_file)
-                xs = XarrayStream(ds, time='time', lat='latitude', lon='longitude')
-                qc_results = xs.run(c)
-                collected_list = collect_results(qc_results, how='list')
+                # Set the qc configuration path
+                qc_config_root = os.path.join(data_home, 'qc', 'config')
+                if not os.path.isdir(qc_config_root):
+                    logging.warning('Invalid QC config root: {:s}'.format(qc_config_root))
+                    return 1
 
-                # Parse each gross/flatline QC result
-                for cl in collected_list:
-                    sensor = cl.stream_id
-                    test = cl.test
-                    qc_varname = f'{sensor}_{cl.package}_{test}'
-                    logging.info('Parsing QC results: {:s}'.format(qc_varname))
-                    flag_results = cl.results.data
+                # run gross and flat line tests
+                # Set the path for the gross range and flat line configuration files
+                qc_config_gross_flatline = os.path.join(qc_config_root, 'gross_flatline')
 
-                    # Defining gross/flatline QC variable attributes
-                    attrs = set_qartod_attrs(test, sensor, c.config[sensor]['qartod'][test])
-                    if not hasattr(ds[sensor], 'ancillary_variables'):
-                        ds[sensor].attrs['ancillary_variables'] = qc_varname
-                    else:
-                        ds[sensor].attrs['ancillary_variables'] = ' '.join((ds[sensor].ancillary_variables, qc_varname))
+                # List the instruments in the netcdf file
+                instruments = [x for x in list(ds.data_vars) if 'instrument_' in x]
 
-                    # Add gross/flatline QC variable to the original dataset
-                    da = xr.DataArray(flag_results, coords=ds[sensor].coords, dims=ds[sensor].dims,
-                                      name=qc_varname,
-                                      attrs=attrs)
-                    ds[qc_varname] = da
+                for inst in instruments:
+                    # Define the instrument make/model
+                    try:
+                        model = ds[inst].make_model
+                    except AttributeError:
+                        logging.error('Sensor make_model not specified {:s}'.format(inst))
 
-            # manually run gross range test for pressure based on depth_rating in file
-            test = 'gross_range_test'
-            sensor = 'pressure'
+                    # Build the configuration filename based on the instrument, make and model
+                    qc_config_filename = define_gross_flatline_config(inst, model)
 
-            # convert the depth_rating in the file (meters) to dbar before comparison with the pressure variable
-            depth_rating = float("".join(filter(str.isdigit, ds.platform.depth_rating)))
-            pressure_rating = gsw.p_from_z(-depth_rating, np.nanmean(ds.profile_lat.values))
-            cinfo = {'fail_span': [0, pressure_rating]}
-            qc_varname = f'{sensor}_qartod_gross_range_test'
-            flag_vals = qartod.gross_range_test(inp=ds[sensor].values,
-                                                **cinfo)
+                    qc_config_file = os.path.join(qc_config_gross_flatline, qc_config_filename)
 
-            # Define QC variable attributes, add a comment about the conversion from depth_rating in meters to dbar
-            cinfo = {'fail_span': [0, int(depth_rating)]}
-            attrs = set_qartod_attrs(test, sensor, cinfo)
-            attrs['comment'] = 'Glider depth rating (m) in flag_configurations converted to pressure (dbar) from ' \
-                               'pressure and profile_lat using gsw.p_from_z'
-            if not hasattr(ds[sensor],'ancillary_variables'):
-                ds[sensor].attrs['ancillary_variables'] = qc_varname
-            else:
-                ds[sensor].attrs['ancillary_variables'] = ' '.join((ds[sensor].ancillary_variables, qc_varname))
+                    if not os.path.isfile(qc_config_file):
+                        logging.warning('Missing QC configuration file: {:s} {:s}'.format(inst, qc_config_file))
+                        continue
+                    logging.info('QC configuration file: {:s}'.format(qc_config_file))
 
-            # Add QC variable to the original dataset
-            da = xr.DataArray(flag_vals, coords=ds[sensor].coords, dims=ds[sensor].dims,
-                                      name=qc_varname, attrs=attrs)
-            ds[qc_varname] = da
+                    # Run ioos_qc gross/flatline tests based on the QC configuration file
+                    c = Config(qc_config_file)
+                    xs = XarrayStream(ds, time='time', lat='latitude', lon='longitude')
+                    qc_results = xs.run(c)
+                    collected_list = collect_results(qc_results, how='list')
 
-            # Find the configuration files for the climatology, spike, rate of change, and pressure tests
-            c = build_global_regional_config(ds, qc_config_root)
+                    # Parse each gross/flatline QC result
+                    for cl in collected_list:
+                        sensor = cl.stream_id
+                        test = cl.test
+                        qc_varname = f'{sensor}_{cl.package}_{test}'
+                        logging.info('Parsing QC results: {:s}'.format(qc_varname))
+                        flag_results = cl.results.data
 
-            # run climatology, spike, rate of change, and pressure tests
-            times = ds.time.values
-            for sensor, config_info in c['streams'].items():
-                if sensor not in ds.data_vars:
-                    continue
-                # grab data for sensor
-                data = ds[sensor].values
-                # identify where not nan
-                non_nan_ind = np.invert(np.isnan(data))
-                # get locations of non-nans
-                non_nan_i = np.where(non_nan_ind)[0]
-                # get time interval (s) between non-nan points
-                tdiff = np.diff(times[non_nan_ind]).astype('timedelta64[s]').astype(float)
-                # locate time intervals > 5 min
-                tdiff_long = np.where(tdiff > 60 * 5)[0]
-                # original locations of where time interval is long
-                tdiff_long_i = np.append(non_nan_i[tdiff_long], non_nan_i[tdiff_long + 1])
-
-                for test, cinfo in config_info['qartod'].items():
-                    if test == 'pressure_test':  # check that the pressure values are continually increasing/decreasing
-                        qc_varname = f'{sensor}_qartod_pressure_test'
-                        flag_vals = 2 * np.ones(np.shape(data))
-                        flag_vals[np.invert(non_nan_ind)] = qartod.QartodFlags.MISSING
-
-                        # only run the test if the array has values
-                        if len(non_nan_i) > 0:
-                            flag_vals[non_nan_ind] = qartod.pressure_test(inp=data[non_nan_ind],
-                                                                          tinp=times[non_nan_ind],
-                                                                          **cinfo)
-
-                    elif test == 'climatology_test':
-                        qc_varname = f'{sensor}_qartod_climatology_test'
-                        climatology_settings = {'tspan': [c['window']['starting'] - timedelta(days=2),
-                                                          c['window']['ending'] + timedelta(days=2)],
-                                                'fspan': None, 'vspan': None, 'zspan': None}
-
-                        # if no set depth range, apply thresholds to full profile depth
-                        if 'depth_range' not in cinfo.keys():
-                            climatology_settings['zspan'] = [0, np.nanmax(ds.depth.values)]
-
-                            if 'suspect_span' in cinfo.keys():
-                                climatology_settings['vspan'] = cinfo['suspect_span']
-                            if 'fail_span' in cinfo.keys():
-                                climatology_settings['fspan'] = cinfo['fail_span']
-
-                            climatology_config = qartod.ClimatologyConfig()
-                            climatology_config.add(**climatology_settings)
-                            flag_vals = qartod.climatology_test(config=climatology_config,
-                                                                inp=data,
-                                                                tinp=times,
-                                                                zinp=ds.depth.values)
+                        # Defining gross/flatline QC variable attributes
+                        attrs = set_qartod_attrs(test, sensor, c.config[sensor]['qartod'][test])
+                        if not hasattr(ds[sensor], 'ancillary_variables'):
+                            ds[sensor].attrs['ancillary_variables'] = qc_varname
                         else:
-                            # if one depth range provided, apply thresholds only to that depth range
-                            if len(np.shape(cinfo['depth_range'])) == 1:
-                                climatology_settings = {'tspan': [c['window']['starting'] - timedelta(days=2),
-                                                                  c['window']['ending'] + timedelta(days=2)],
-                                                        'fspan': cinfo['depth_range'],
-                                                        'vspan': None, 'zspan': None}
+                            ds[sensor].attrs['ancillary_variables'] = ' '.join((ds[sensor].ancillary_variables, qc_varname))
+
+                        # Add gross/flatline QC variable to the original dataset
+                        da = xr.DataArray(flag_results, coords=ds[sensor].coords, dims=ds[sensor].dims,
+                                          name=qc_varname,
+                                          attrs=attrs)
+                        ds[qc_varname] = da
+
+                # manually run gross range test for pressure based on depth_rating in file
+                test = 'gross_range_test'
+                sensor = 'pressure'
+
+                # convert the depth_rating in the file (meters) to dbar before comparison with the pressure variable
+                depth_rating = float("".join(filter(str.isdigit, ds.platform.depth_rating)))
+                pressure_rating = gsw.p_from_z(-depth_rating, np.nanmean(ds.profile_lat.values))
+                cinfo = {'fail_span': [0, pressure_rating]}
+                qc_varname = f'{sensor}_qartod_gross_range_test'
+                flag_vals = qartod.gross_range_test(inp=ds[sensor].values,
+                                                    **cinfo)
+
+                # Define QC variable attributes, add a comment about the conversion from depth_rating in meters to dbar
+                cinfo = {'fail_span': [0, int(depth_rating)]}
+                attrs = set_qartod_attrs(test, sensor, cinfo)
+                attrs['comment'] = 'Glider depth rating (m) in flag_configurations converted to pressure (dbar) from ' \
+                                   'pressure and profile_lat using gsw.p_from_z'
+                if not hasattr(ds[sensor],'ancillary_variables'):
+                    ds[sensor].attrs['ancillary_variables'] = qc_varname
+                else:
+                    ds[sensor].attrs['ancillary_variables'] = ' '.join((ds[sensor].ancillary_variables, qc_varname))
+
+                # Add QC variable to the original dataset
+                da = xr.DataArray(flag_vals, coords=ds[sensor].coords, dims=ds[sensor].dims,
+                                          name=qc_varname, attrs=attrs)
+                ds[qc_varname] = da
+
+                # Find the configuration files for the climatology, spike, rate of change, and pressure tests
+                c = build_global_regional_config(ds, qc_config_root)
+
+                # run climatology, spike, rate of change, and pressure tests
+                times = ds.time.values
+                for sensor, config_info in c['streams'].items():
+                    if sensor not in ds.data_vars:
+                        continue
+                    # grab data for sensor
+                    data = ds[sensor].values
+                    # identify where not nan
+                    non_nan_ind = np.invert(np.isnan(data))
+                    # get locations of non-nans
+                    non_nan_i = np.where(non_nan_ind)[0]
+                    # get time interval (s) between non-nan points
+                    tdiff = np.diff(times[non_nan_ind]).astype('timedelta64[s]').astype(float)
+                    # locate time intervals > 5 min
+                    tdiff_long = np.where(tdiff > 60 * 5)[0]
+                    # original locations of where time interval is long
+                    tdiff_long_i = np.append(non_nan_i[tdiff_long], non_nan_i[tdiff_long + 1])
+
+                    for test, cinfo in config_info['qartod'].items():
+                        if test == 'pressure_test':  # check that the pressure values are continually increasing/decreasing
+                            qc_varname = f'{sensor}_qartod_pressure_test'
+                            flag_vals = 2 * np.ones(np.shape(data))
+                            flag_vals[np.invert(non_nan_ind)] = qartod.QartodFlags.MISSING
+
+                            # only run the test if the array has values
+                            if len(non_nan_i) > 0:
+                                flag_vals[non_nan_ind] = qartod.pressure_test(inp=data[non_nan_ind],
+                                                                              tinp=times[non_nan_ind],
+                                                                              **cinfo)
+
+                        elif test == 'climatology_test':
+                            qc_varname = f'{sensor}_qartod_climatology_test'
+                            climatology_settings = {'tspan': [c['window']['starting'] - timedelta(days=2),
+                                                              c['window']['ending'] + timedelta(days=2)],
+                                                    'fspan': None, 'vspan': None, 'zspan': None}
+
+                            # if no set depth range, apply thresholds to full profile depth
+                            if 'depth_range' not in cinfo.keys():
+                                climatology_settings['zspan'] = [0, np.nanmax(ds.depth.values)]
 
                                 if 'suspect_span' in cinfo.keys():
                                     climatology_settings['vspan'] = cinfo['suspect_span']
@@ -334,79 +300,98 @@ def main(args):
                                                                     inp=data,
                                                                     tinp=times,
                                                                     zinp=ds.depth.values)
-
-                            else:  # if different thresholds for multiple depth ranges, loop through each
-                                flag_vals = 2 * np.ones(np.shape(data))
-                                for z_int in range(len(cinfo['depth_range'])):
+                            else:
+                                # if one depth range provided, apply thresholds only to that depth range
+                                if len(np.shape(cinfo['depth_range'])) == 1:
                                     climatology_settings = {'tspan': [c['window']['starting'] - timedelta(days=2),
                                                                       c['window']['ending'] + timedelta(days=2)],
-                                                            'fspan': cinfo['depth_range'][z_int],
+                                                            'fspan': cinfo['depth_range'],
                                                             'vspan': None, 'zspan': None}
 
                                     if 'suspect_span' in cinfo.keys():
-                                        climatology_settings['vspan'] = cinfo['suspect_span'][z_int]
+                                        climatology_settings['vspan'] = cinfo['suspect_span']
                                     if 'fail_span' in cinfo.keys():
-                                        climatology_settings['fspan'] = cinfo['fail_span'][z_int]
+                                        climatology_settings['fspan'] = cinfo['fail_span']
 
                                     climatology_config = qartod.ClimatologyConfig()
                                     climatology_config.add(**climatology_settings)
-                                    z_ind = np.logical_and(
-                                        ds.depth.values > cinfo['depth_range'][z_int][0],
-                                        ds.depth.values <= cinfo['depth_range'][z_int][1])
+                                    flag_vals = qartod.climatology_test(config=climatology_config,
+                                                                        inp=data,
+                                                                        tinp=times,
+                                                                        zinp=ds.depth.values)
 
-                                    flag_vals[z_ind] = qartod.climatology_test(config=climatology_config,
-                                                                               inp=data[z_ind],
-                                                                               tinp=times[z_ind],
-                                                                               zinp=ds.depth.values[z_ind])
+                                else:  # if different thresholds for multiple depth ranges, loop through each
+                                    flag_vals = 2 * np.ones(np.shape(data))
+                                    for z_int in range(len(cinfo['depth_range'])):
+                                        climatology_settings = {'tspan': [c['window']['starting'] - timedelta(days=2),
+                                                                          c['window']['ending'] + timedelta(days=2)],
+                                                                'fspan': cinfo['depth_range'][z_int],
+                                                                'vspan': None, 'zspan': None}
 
-                    elif test == 'spike_test':
-                        qc_varname = f'{sensor}_qartod_spike_test'
-                        spike_settings = {'suspect_threshold': None, 'fail_threshold': None}
+                                        if 'suspect_span' in cinfo.keys():
+                                            climatology_settings['vspan'] = cinfo['suspect_span'][z_int]
+                                        if 'fail_span' in cinfo.keys():
+                                            climatology_settings['fspan'] = cinfo['fail_span'][z_int]
 
-                        # convert original threshold from units/s to units/average-timestep
-                        if 'suspect_threshold' in cinfo.keys():
-                            spike_settings['suspect_threshold'] = cinfo['suspect_threshold'] * np.nanmedian(tdiff)
-                        if 'fail_threshold' in cinfo.keys():
-                            spike_settings['fail_threshold'] = cinfo['fail_threshold'] * np.nanmedian(tdiff)
+                                        climatology_config = qartod.ClimatologyConfig()
+                                        climatology_config.add(**climatology_settings)
+                                        z_ind = np.logical_and(
+                                            ds.depth.values > cinfo['depth_range'][z_int][0],
+                                            ds.depth.values <= cinfo['depth_range'][z_int][1])
 
-                        flag_vals = 2 * np.ones(np.shape(data))
-                        flag_vals[np.invert(non_nan_ind)] = qartod.QartodFlags.MISSING
+                                        flag_vals[z_ind] = qartod.climatology_test(config=climatology_config,
+                                                                                   inp=data[z_ind],
+                                                                                   tinp=times[z_ind],
+                                                                                   zinp=ds.depth.values[z_ind])
 
-                        # only run the test if the array has values
-                        if len(non_nan_i) > 0:
-                            flag_vals[non_nan_ind] = qartod.spike_test(inp=data[non_nan_ind],
-                                                                       method='differential',
-                                                                       **spike_settings)
-                            # flag as unknown on either end of long time gap
-                            flag_vals[tdiff_long_i] = qartod.QartodFlags.UNKNOWN
+                        elif test == 'spike_test':
+                            qc_varname = f'{sensor}_qartod_spike_test'
+                            spike_settings = {'suspect_threshold': None, 'fail_threshold': None}
 
-                    elif test == 'rate_of_change_test':
-                        qc_varname = f'{sensor}_qartod_rate_of_change_test'
-                        flag_vals = 2 * np.ones(np.shape(data))
-                        flag_vals[np.invert(non_nan_ind)] = qartod.QartodFlags.MISSING
+                            # convert original threshold from units/s to units/average-timestep
+                            if 'suspect_threshold' in cinfo.keys():
+                                spike_settings['suspect_threshold'] = cinfo['suspect_threshold'] * np.nanmedian(tdiff)
+                            if 'fail_threshold' in cinfo.keys():
+                                spike_settings['fail_threshold'] = cinfo['fail_threshold'] * np.nanmedian(tdiff)
 
-                        # only run the test if the array has values
-                        if len(non_nan_i) > 0:
-                            flag_vals[non_nan_ind] = qartod.rate_of_change_test(inp=data[non_nan_ind],
-                                                                                tinp=times[non_nan_ind],
-                                                                                **cinfo)
+                            flag_vals = 2 * np.ones(np.shape(data))
+                            flag_vals[np.invert(non_nan_ind)] = qartod.QartodFlags.MISSING
 
-                    # Define pressure/climatology/spike/rate of change QC variable attributes
-                    attrs = set_qartod_attrs(test, sensor, cinfo)
-                    if not hasattr(ds[sensor], 'ancillary_variables'):
-                        ds[sensor].attrs['ancillary_variables'] = qc_varname
-                    else:
-                        ds[sensor].attrs['ancillary_variables'] = ' '.join((ds[sensor].ancillary_variables, qc_varname))
+                            # only run the test if the array has values
+                            if len(non_nan_i) > 0:
+                                flag_vals[non_nan_ind] = qartod.spike_test(inp=data[non_nan_ind],
+                                                                           method='differential',
+                                                                           **spike_settings)
+                                # flag as unknown on either end of long time gap
+                                flag_vals[tdiff_long_i] = qartod.QartodFlags.UNKNOWN
 
-                    # Add QC variable to the original dataset
-                    da = xr.DataArray(flag_vals, coords=ds[sensor].coords, dims=ds[sensor].dims,
-                                      name=qc_varname, attrs=attrs)
-                    ds[qc_varname] = da
+                        elif test == 'rate_of_change_test':
+                            qc_varname = f'{sensor}_qartod_rate_of_change_test'
+                            flag_vals = 2 * np.ones(np.shape(data))
+                            flag_vals[np.invert(non_nan_ind)] = qartod.QartodFlags.MISSING
 
-            # TODO add location test
+                            # only run the test if the array has values
+                            if len(non_nan_i) > 0:
+                                flag_vals[non_nan_ind] = qartod.rate_of_change_test(inp=data[non_nan_ind],
+                                                                                    tinp=times[non_nan_ind],
+                                                                                    **cinfo)
 
-            # Save the netcdf file with QC variables over the original file
-            ds.to_netcdf(f)
+                        # Define pressure/climatology/spike/rate of change QC variable attributes
+                        attrs = set_qartod_attrs(test, sensor, cinfo)
+                        if not hasattr(ds[sensor], 'ancillary_variables'):
+                            ds[sensor].attrs['ancillary_variables'] = qc_varname
+                        else:
+                            ds[sensor].attrs['ancillary_variables'] = ' '.join((ds[sensor].ancillary_variables, qc_varname))
+
+                        # Add QC variable to the original dataset
+                        da = xr.DataArray(flag_vals, coords=ds[sensor].coords, dims=ds[sensor].dims,
+                                          name=qc_varname, attrs=attrs)
+                        ds[qc_varname] = da
+
+                # TODO add location test
+
+                # Save the netcdf file with QC variables over the original file
+                ds.to_netcdf(f)
 
     return status
 
