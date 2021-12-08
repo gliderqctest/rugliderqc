@@ -45,7 +45,7 @@ def find_glider_deployment_datapath(logger, deployment, deployments_root, datase
 
 def find_glider_deployments_rootdir(logger):
     # Find the glider deployments root directory
-    data_home = os.getenv('GLIDER_DATA_HOME_TESTa')
+    data_home = os.getenv('GLIDER_DATA_HOME_TEST')
     if not data_home:
         logger.error('GLIDER_DATA_HOME_TEST not set')
         return 1, 1
