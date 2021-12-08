@@ -28,6 +28,7 @@ def find_glider_deployment_datapath(logging, deployment, data_home, dataset_type
                 # Set the deployment netcdf data path
                 data_path = os.path.join(deployment_location, 'data', 'out', 'nc',
                                          '{:s}-{:s}/{:s}'.format(dataset_type, cdm_data_type, mode))
+                logging.info('Data path: {:s}'.format(data_path))
                 if not os.path.isdir(data_path):
                     logging.warning('{:s} data directory not found: {:s}'.format(trajectory, data_path))
                     data_path = None
