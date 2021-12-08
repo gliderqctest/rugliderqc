@@ -11,6 +11,8 @@ Test repository for real-time implementation
 
 `conda activate rugliderqc`
 
+`pip install .`
+
 **Requires replacing scripts in the ioos_qc package (.../envs/rugliderqc/lib/python3.9/site-packages/ioos_qc) with all files of the same name in ./ioos_qc_mods (as of 12/8/2021, only qartod.py) after the environment is created.**
 
 ## Usage
