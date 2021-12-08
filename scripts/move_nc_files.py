@@ -32,7 +32,7 @@ def main(args):
         for deployment in args.deployments:
         # for deployment in [deployments]:
 
-            data_path = find_glider_deployment_datapath(logging, deployment, data_home, dataset_type, cdm_data_type, mode)
+            data_path = find_glider_deployment_datapath(logging, deployment, deployments_root, dataset_type, cdm_data_type, mode)
 
             if not data_path:
                 logging.error('{:s} data directory not found:'.format(deployment))
