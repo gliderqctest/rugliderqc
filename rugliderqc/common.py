@@ -40,7 +40,7 @@ def find_glider_deployment_datapath(logger, deployment, deployments_root, datase
         logger.error('Error parsing invalid deployment name {:s}: {:}'.format(deployment, e))
         data_path = None
 
-    return data_path
+    return data_path, deployment_location
 
 
 def find_glider_deployments_rootdir(logger):

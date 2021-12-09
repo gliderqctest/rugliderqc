@@ -144,17 +144,17 @@ def main(args):
         for deployment in args.deployments:
         # for deployment in [deployments]:
 
-            data_path = find_glider_deployment_datapath(logging, deployment, deployments_root, dataset_type, cdm_data_type, mode)
+            data_path, deployment_location = find_glider_deployment_datapath(logging, deployment, deployments_root, dataset_type, cdm_data_type, mode)
 
             if not data_path:
                 logging_base.error('{:s} data directory not found:'.format(deployment))
                 continue
 
-            if not os.path.isdir(os.path.join(data_path,'proc_logs')):
-                logging_base.error('{:s} deployment proc_logs directory not found:'.format(deployment))
+            if not os.path.isdir(os.path.join(data_path,'proc-logs')):
+                logging_base.error('{:s} deployment proc-logs directory not found:'.format(deployment))
                 continue
 
-            logFile = os.path.join(data_path, 'proc_logs', deployment+'_qc_log_' + datetime.now().strftime('%Y%m%d'))
+            logFile = os.path.join(deployment_location, 'proc-logs', deployment+'_qc_log_' + datetime.now().strftime('%Y%m%d'))
             logging = initialize_logging(loglevel, logFile)
 
             # List the netcdf files in queue
