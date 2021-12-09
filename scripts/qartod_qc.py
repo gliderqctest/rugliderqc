@@ -136,7 +136,7 @@ def main(args):
     dataset_type = args.level
     # loglevel = loglevel.upper()
 
-    logFile_base = os.path.join(os.path.expanduser('~'),'glider_qc_log')
+    logFile_base = '/home/glideradm/logs/'+pwd.getpwuid(os.getuid())[0]+'-glider_qc.log'
     logging_base = initialize_logging(loglevel, logFile_base)
 
     data_home, deployments_root = find_glider_deployments_rootdir(logging_base)
@@ -151,7 +151,7 @@ def main(args):
                 logging_base.error('{:s} data directory not found:'.format(deployment))
                 continue
 
-            if not os.path.isdir(os.path.join(data_path,'proc-logs')):
+            if not os.path.isdir(os.path.join(deployment_location,'proc-logs')):
                 logging_base.error('{:s} deployment proc-logs directory not found:'.format(deployment))
                 continue
 
