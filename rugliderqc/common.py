@@ -16,6 +16,7 @@ def find_glider_deployment_datapath(logger, deployment, deployments_root, datase
             logger.error('Error parsing trajectory date {:s}: {:}'.format(trajectory, e))
             trajectory_dt = None
             data_path = None
+            deployment_location = None
 
         if trajectory_dt:
             trajectory = '{:s}-{:s}'.format(glider, trajectory_dt.strftime('%Y%m%dT%H%M'))
@@ -32,13 +33,16 @@ def find_glider_deployment_datapath(logger, deployment, deployments_root, datase
                 if not os.path.isdir(data_path):
                     logger.warning('{:s} data directory not found: {:s}'.format(trajectory, data_path))
                     data_path = None
+                    deployment_location = None
             else:
                 logger.warning('Deployment location does not exist: {:s}'.format(deployment_location))
                 data_path = None
+                deployment_location = None
 
     except ValueError as e:
         logger.error('Error parsing invalid deployment name {:s}: {:}'.format(deployment, e))
         data_path = None
+        deployment_location = None
 
     return data_path, deployment_location
 

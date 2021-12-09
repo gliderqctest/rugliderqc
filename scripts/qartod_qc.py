@@ -135,7 +135,7 @@ def main(args):
     dataset_type = args.level
     # loglevel = loglevel.upper()
 
-    logFile_base = os.path.join(os.path.expanduser('~'),'glider_qc_log_'+datetime.now().strftime('%Y%m%d'))
+    logFile_base = os.path.join(os.path.expanduser('~'),'glider_qc_log')
     logging_base = initialize_logging(loglevel, logFile_base)
 
     data_home, deployments_root = find_glider_deployments_rootdir(logging_base)
@@ -144,7 +144,7 @@ def main(args):
         for deployment in args.deployments:
         # for deployment in [deployments]:
 
-            data_path, deployment_location = find_glider_deployment_datapath(logging, deployment, deployments_root, dataset_type, cdm_data_type, mode)
+            data_path, deployment_location = find_glider_deployment_datapath(logging_base, deployment, deployments_root, dataset_type, cdm_data_type, mode)
 
             if not data_path:
                 logging_base.error('{:s} data directory not found:'.format(deployment))
