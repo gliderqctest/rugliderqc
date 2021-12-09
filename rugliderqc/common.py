@@ -6,7 +6,7 @@ from dateutil import parser
 
 
 def find_glider_deployment_datapath(logger, deployment, deployments_root, dataset_type, cdm_data_type, mode):
-    logger.info('Checking deployment {:s}'.format(deployment))
+    #logger.info('Checking deployment {:s}'.format(deployment))
 
     try:
         (glider, trajectory) = deployment.split('-')
@@ -23,12 +23,12 @@ def find_glider_deployment_datapath(logger, deployment, deployments_root, datase
 
             # Create fully-qualified path to the deployment location
             deployment_location = os.path.join(deployments_root, deployment_name)
-            logger.info('Deployment location: {:s}'.format(deployment_location))
+            #logger.info('Deployment location: {:s}'.format(deployment_location))
             if os.path.isdir(deployment_location):
                 # Set the deployment netcdf data path
                 data_path = os.path.join(deployment_location, 'data', 'out', 'nc',
                                          '{:s}-{:s}/{:s}'.format(dataset_type, cdm_data_type, mode))
-                logger.info('Data path: {:s}'.format(data_path))
+                #logger.info('Data path: {:s}'.format(data_path))
                 if not os.path.isdir(data_path):
                     logger.warning('{:s} data directory not found: {:s}'.format(trajectory, data_path))
                     data_path = None
@@ -61,12 +61,12 @@ def find_glider_deployments_rootdir(logger):
     return data_home, deployments_root
 
 
-def initialize_logging(loglevel):
+def initialize_logging(loglevel, logfile):
     import logging
 
     # Set up the logger
     log_level = getattr(logging, loglevel)
     log_format = '%(asctime)s%(module)s:%(levelname)s:%(message)s [line %(lineno)d]'
-    logging.basicConfig(format=log_format, level=log_level)
+    logging.basicConfig(filename=logfile, filemode='a', format=log_format, level=log_level)
 
     return logging

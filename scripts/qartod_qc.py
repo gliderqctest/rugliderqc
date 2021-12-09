@@ -9,7 +9,7 @@ Run ioos_qc QARTOD tests on processed glider NetCDF files and append the results
 import os
 import argparse
 import sys
-from datetime import timedelta
+from datetime import timedelta, datetime
 import glob
 import numpy as np
 import pandas as pd
@@ -135,9 +135,10 @@ def main(args):
     dataset_type = args.level
     # loglevel = loglevel.upper()
 
-    logging = initialize_logging(loglevel)
+    logFile_base = os.path.join(os.path.expanduser('~'),'glider_qc_log_'+datetime.now().strftime('%Y%m%d'))
+    logging_base = initialize_logging(loglevel, logFile_base)
 
-    data_home, deployments_root = find_glider_deployments_rootdir(logging)
+    data_home, deployments_root = find_glider_deployments_rootdir(logging_base)
     if isinstance(deployments_root, str):
 
         for deployment in args.deployments:
@@ -146,8 +147,15 @@ def main(args):
             data_path = find_glider_deployment_datapath(logging, deployment, deployments_root, dataset_type, cdm_data_type, mode)
 
             if not data_path:
-                logging.error('{:s} data directory not found:'.format(deployment))
+                logging_base.error('{:s} data directory not found:'.format(deployment))
                 continue
+
+            if not os.path.isdir(os.path.join(data_path,'proc_logs')):
+                logging_base.error('{:s} deployment proc_logs directory not found:'.format(deployment))
+                continue
+
+            logFile = os.path.join(data_path, 'proc_logs', deployment+'_qc_log_' + datetime.now().strftime('%Y%m%d'))
+            logging = initialize_logging(loglevel, logFile)
 
             # List the netcdf files in queue
             ncfiles = sorted(glob.glob(os.path.join(data_path, 'queue', '*.nc')))
