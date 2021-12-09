@@ -7,6 +7,7 @@ Run ioos_qc QARTOD tests on processed glider NetCDF files and append the results
 """
 
 import os
+import pwd
 import argparse
 import sys
 from datetime import timedelta, datetime
@@ -154,7 +155,7 @@ def main(args):
                 logging_base.error('{:s} deployment proc-logs directory not found:'.format(deployment))
                 continue
 
-            logFile = os.path.join(deployment_location, 'proc-logs', deployment+'_qc_log_' + datetime.now().strftime('%Y%m%d'))
+            logFile = os.path.join(deployment_location, 'proc-logs', '-'.join([pwd.getpwuid(os.getuid())[0], datetime.now().strftime('%Y%m%d')+'_'+deployment, dataset_type, cdm_data_type, mode, 'qc']) + '.log' )
             logging = initialize_logging(loglevel, logFile)
 
             # List the netcdf files in queue
