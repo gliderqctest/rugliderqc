@@ -63,17 +63,3 @@ def find_glider_deployments_rootdir(logger):
         return 1, 1
 
     return data_home, deployments_root
-
-
-def setup_logger(name, loglevel, logfile):
-    import logging
-    log_format = logging.Formatter('%(asctime)s%(module)s:%(levelname)s:%(message)s [line %(lineno)d]')
-    handler = logging.FileHandler(logfile)
-    handler.setFormatter(log_format)
-
-    logger = logging.getLogger(name)
-    log_level = getattr(logging, loglevel)
-    logger.setLevel(log_level)
-    logger.addHandler(handler)
-
-    return logger

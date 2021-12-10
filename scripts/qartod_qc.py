@@ -2,15 +2,14 @@
 
 """
 Author: lnazzaro and lgarzio on 12/7/2021
-Last modified: lgarzio on 12/9/2021
+Last modified: lgarzio on 12/10/2021
 Run ioos_qc QARTOD tests on processed glider NetCDF files and append the results to the original file.
 """
 
 import os
-import pwd
 import argparse
 import sys
-from datetime import timedelta, datetime
+from datetime import timedelta
 import glob
 import numpy as np
 import pandas as pd
@@ -23,7 +22,8 @@ from ioos_qc.results import collect_results
 from ioos_qc.utils import load_config_as_dict as loadconfig
 from shapely.geometry import Point
 from shapely.geometry.polygon import Polygon
-from rugliderqc.common import find_glider_deployment_datapath, find_glider_deployments_rootdir, setup_logger
+from rugliderqc.common import find_glider_deployment_datapath, find_glider_deployments_rootdir
+from rugliderqc.loggers import logfile_basename, setup_logger, logfile_deploymentname
 
 
 def build_global_regional_config(ds, qc_config_root):
@@ -134,11 +134,10 @@ def main(args):
     cdm_data_type = args.cdm_data_type
     mode = args.mode
     dataset_type = args.level
-    # loglevel = loglevel.upper()
+    # loglevel = loglevel.upper()  # for debugging
 
-    # logFile_base = os.path.join(os.path.expanduser('~'), 'glider_qc_log')
-    user = pwd.getpwuid(os.getuid())[0]
-    logFile_base = f'/home/glideradm/logs/{user}-glider_qc.log'
+    # logFile_base = os.path.join(os.path.expanduser('~'), 'glider_qc_log')  # for debugging
+    logFile_base = logfile_basename()
     logging_base = setup_logger('logging_base', loglevel, logFile_base)
 
     data_home, deployments_root = find_glider_deployments_rootdir(logging_base)
@@ -154,12 +153,11 @@ def main(args):
                 logging_base.error('{:s} data directory not found:'.format(deployment))
                 continue
 
-            if not os.path.isdir(os.path.join(deployment_location,'proc-logs')):
+            if not os.path.isdir(os.path.join(deployment_location, 'proc-logs')):
                 logging_base.error('{:s} deployment proc-logs directory not found:'.format(deployment))
                 continue
 
-            logfilename = '-'.join([user, datetime.now().strftime('%Y%m%d') + '_' + deployment,
-                                    dataset_type, cdm_data_type, mode, 'qc']) + '.log'
+            logfilename = logfile_deploymentname(deployment, dataset_type, cdm_data_type, mode)
             logFile = os.path.join(deployment_location, 'proc-logs', logfilename)
             logging = setup_logger('logging', loglevel, logFile)
 
