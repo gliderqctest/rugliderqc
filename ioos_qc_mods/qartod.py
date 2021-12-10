@@ -277,7 +277,7 @@ def pressure_test(inp: Sequence[N],
             profile_direction = 'up'
         else:
             flag_arr[:] = QartodFlags.UNKNOWN
-            logging.warning('Profile direction not consistent enough to be clearly identified as either up or down.')
+            print('WARNING: Profile direction not consistent enough to be clearly identified as either up or down.')
     else:
         raise ValueError(
             'Unknown profile_direction: "{0}", only "up or u" and "down or d" methods, or "unknown" to calculate based on given data, are available'
