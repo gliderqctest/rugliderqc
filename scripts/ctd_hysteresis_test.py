@@ -2,7 +2,7 @@
 
 """
 Author: lnazzaro and lgarzio on 12/7/2021
-Last modified: lgarzio on 12/7/2021
+Last modified: lgarzio on 12/10/2021
 Flag CTD profile pairs that are severely lagged, usually due to CTD pump issues. This test checks the conductivity
 variable.
 """
@@ -17,7 +17,8 @@ from shapely.geometry import Polygon, MultiPolygon
 from shapely.ops import polygonize
 from ioos_qc import qartod
 from ioos_qc.utils import load_config_as_dict as loadconfig
-from rugliderqc.common import find_glider_deployment_datapath, find_glider_deployments_rootdir, initialize_logging
+from rugliderqc.common import find_glider_deployment_datapath, find_glider_deployments_rootdir
+from rugliderqc.loggers import logfile_basename, setup_logger, logfile_deploymentname
 np.set_printoptions(suppress=True)
 
 
@@ -102,25 +103,37 @@ def main(args):
     dataset_type = args.level
     # loglevel = loglevel.upper()
 
-    logging = initialize_logging(loglevel)
 
-    data_home, deployments_root = find_glider_deployments_rootdir(logging)
+    # logFile_base = os.path.join(os.path.expanduser('~'), 'glider_qc_log')  # for debugging
+    logFile_base = logfile_basename()
+    logging_base = setup_logger('logging_base', loglevel, logFile_base)
+
+    data_home, deployments_root = find_glider_deployments_rootdir(logging_base)
     if isinstance(deployments_root, str):
 
         # Set the default qc configuration path
         qc_config_root = os.path.join(data_home, 'qc', 'config')
         if not os.path.isdir(qc_config_root):
-            logging.warning('Invalid QC config root: {:s}'.format(qc_config_root))
+            logging_base.warning('Invalid QC config root: {:s}'.format(qc_config_root))
             return 1
 
         for deployment in args.deployments:
         # for deployment in [deployments]:
 
-            data_path = find_glider_deployment_datapath(logging, deployment, deployments_root, dataset_type, cdm_data_type, mode)
+            data_path, deployment_location = find_glider_deployment_datapath(logging_base, deployment, deployments_root,
+                                                                             dataset_type, cdm_data_type, mode)
 
             if not data_path:
-                logging.error('{:s} data directory not found:'.format(deployment))
+                logging_base.error('{:s} data directory not found:'.format(deployment))
                 continue
+
+            if not os.path.isdir(os.path.join(deployment_location, 'proc-logs')):
+                logging_base.error('{:s} deployment proc-logs directory not found:'.format(deployment))
+                continue
+
+            logfilename = logfile_deploymentname(deployment, dataset_type, cdm_data_type, mode)
+            logFile = os.path.join(deployment_location, 'proc-logs', logfilename)
+            logging = setup_logger('logging', loglevel, logFile)
 
             # Set the deployment qc configuration path
             deployment_location = data_path.split('/data')[0]

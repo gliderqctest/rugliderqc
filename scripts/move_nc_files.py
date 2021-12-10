@@ -2,7 +2,7 @@
 
 """
 Author: lgarzio on 12/7/2021
-Last modified: lgarzio on 12/7/2021
+Last modified: lgarzio on 12/10/2021
 Move quality controlled glider NetCDF files to the final data directory (out of queue) to send to ERDDAP
 """
 
@@ -11,7 +11,8 @@ import argparse
 import sys
 import glob
 from pathlib import Path
-from rugliderqc.common import find_glider_deployment_datapath, find_glider_deployments_rootdir, initialize_logging
+from rugliderqc.common import find_glider_deployment_datapath, find_glider_deployments_rootdir
+from rugliderqc.loggers import logfile_basename, setup_logger, logfile_deploymentname
 
 
 def main(args):
@@ -24,27 +25,43 @@ def main(args):
     dataset_type = args.level
     # loglevel = loglevel.upper()
 
-    logging = initialize_logging(loglevel)
 
-    data_home, deployments_root = find_glider_deployments_rootdir(logging)
+    # logFile_base = os.path.join(os.path.expanduser('~'), 'glider_qc_log')  # for debugging
+    logFile_base = logfile_basename()
+    logging_base = setup_logger('logging_base', loglevel, logFile_base)
+
+    data_home, deployments_root = find_glider_deployments_rootdir(logging_base)
     if isinstance(deployments_root, str):
 
         for deployment in args.deployments:
         # for deployment in [deployments]:
 
-            data_path = find_glider_deployment_datapath(logging, deployment, deployments_root, dataset_type, cdm_data_type, mode)
+            data_path, deployment_location = find_glider_deployment_datapath(logging_base, deployment, deployments_root,
+                                                                             dataset_type, cdm_data_type, mode)
 
             if not data_path:
-                logging.error('{:s} data directory not found:'.format(deployment))
+                logging_base.error('{:s} data directory not found:'.format(deployment))
                 continue
+
+            if not os.path.isdir(os.path.join(deployment_location, 'proc-logs')):
+                logging_base.error('{:s} deployment proc-logs directory not found:'.format(deployment))
+                continue
+
+            logfilename = logfile_deploymentname(deployment, dataset_type, cdm_data_type, mode)
+            logFile = os.path.join(deployment_location, 'proc-logs', logfilename)
+            logging = setup_logger('logging', loglevel, logFile)
 
             # List the netcdf files in queue
             ncfiles = sorted(glob.glob(os.path.join(data_path, 'queue', '*.nc')))
 
             # Iterate through files and move them to the parent directory
+            moved = 0
             for f in ncfiles:
                 p = Path(f).absolute()
                 p.rename(os.path.join(data_path, p.name))
+                moved += 1
+
+            logging.info('Moved {:} of {:} valid files to: {:s}'.format(moved, len(ncfiles), data_path))
 
         return status
 
