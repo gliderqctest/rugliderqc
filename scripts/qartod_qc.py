@@ -2,7 +2,7 @@
 
 """
 Author: lnazzaro and lgarzio on 12/7/2021
-Last modified: lgarzio on 12/7/2021
+Last modified: lgarzio on 12/9/2021
 Run ioos_qc QARTOD tests on processed glider NetCDF files and append the results to the original file.
 """
 
@@ -23,7 +23,7 @@ from ioos_qc.results import collect_results
 from ioos_qc.utils import load_config_as_dict as loadconfig
 from shapely.geometry import Point
 from shapely.geometry.polygon import Polygon
-from rugliderqc.common import find_glider_deployment_datapath, find_glider_deployments_rootdir, initialize_logging
+from rugliderqc.common import find_glider_deployment_datapath, find_glider_deployments_rootdir, setup_logger
 
 
 def build_global_regional_config(ds, qc_config_root):
@@ -136,8 +136,10 @@ def main(args):
     dataset_type = args.level
     # loglevel = loglevel.upper()
 
-    logFile_base = '/home/glideradm/logs/'+pwd.getpwuid(os.getuid())[0]+'-glider_qc.log'
-    logging_base = initialize_logging(loglevel, logFile_base)
+    # logFile_base = os.path.join(os.path.expanduser('~'), 'glider_qc_log')
+    user = pwd.getpwuid(os.getuid())[0]
+    logFile_base = f'/home/glideradm/logs/{user}-glider_qc.log'
+    logging_base = setup_logger('logging_base', loglevel, logFile_base)
 
     data_home, deployments_root = find_glider_deployments_rootdir(logging_base)
     if isinstance(deployments_root, str):
@@ -145,7 +147,8 @@ def main(args):
         for deployment in args.deployments:
         # for deployment in [deployments]:
 
-            data_path, deployment_location = find_glider_deployment_datapath(logging_base, deployment, deployments_root, dataset_type, cdm_data_type, mode)
+            data_path, deployment_location = find_glider_deployment_datapath(logging_base, deployment, deployments_root,
+                                                                             dataset_type, cdm_data_type, mode)
 
             if not data_path:
                 logging_base.error('{:s} data directory not found:'.format(deployment))
@@ -155,8 +158,10 @@ def main(args):
                 logging_base.error('{:s} deployment proc-logs directory not found:'.format(deployment))
                 continue
 
-            logFile = os.path.join(deployment_location, 'proc-logs', '-'.join([pwd.getpwuid(os.getuid())[0], datetime.now().strftime('%Y%m%d')+'_'+deployment, dataset_type, cdm_data_type, mode, 'qc']) + '.log' )
-            logging = initialize_logging(loglevel, logFile)
+            logfilename = '-'.join([user, datetime.now().strftime('%Y%m%d') + '_' + deployment,
+                                    dataset_type, cdm_data_type, mode, 'qc']) + '.log'
+            logFile = os.path.join(deployment_location, 'proc-logs', logfilename)
+            logging = setup_logger('logging', loglevel, logFile)
 
             # List the netcdf files in queue
             ncfiles = sorted(glob.glob(os.path.join(data_path, 'queue', '*.nc')))
