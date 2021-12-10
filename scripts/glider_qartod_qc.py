@@ -136,8 +136,8 @@ def main(args):
     dataset_type = args.level
     # loglevel = loglevel.upper()  # for debugging
 
-    # logFile_base = os.path.join(os.path.expanduser('~'), 'glider_qc_log')  # for debugging
-    logFile_base = logfile_basename()
+    logFile_base = os.path.join(os.path.expanduser('~'), 'glider_qc_log')  # for debugging
+    #logFile_base = logfile_basename()
     logging_base = setup_logger('logging_base', loglevel, logFile_base)
 
     data_home, deployments_root = find_glider_deployments_rootdir(logging_base)

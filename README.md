@@ -22,7 +22,7 @@ Test repository for real-time implementation
 This wrapper script runs:
 
 1. check_duplicate_timestamps.py
-2. qartod_qc.py
+2. glider_qartod_qc.py
 3. ctd_hysteresis_test.py
 4. <summarize_qc_flags - not written yet>
 5. move_nc_files.py
