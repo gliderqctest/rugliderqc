@@ -54,6 +54,11 @@ def main(args):
             # List the netcdf files in queue
             ncfiles = sorted(glob.glob(os.path.join(data_path, 'queue', '*.nc')))
 
+            if len(ncfiles) == 0:
+                logging.error(' 0 files found to move: {:s}'.format(os.path.join(data_path, 'queue')))
+                status = 1
+                continue
+
             # Iterate through files and move them to the parent directory
             moved = 0
             for f in ncfiles:

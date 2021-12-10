@@ -58,6 +58,11 @@ def main(args):
             # List the netcdf files in queue
             ncfiles = sorted(glob.glob(os.path.join(data_path, 'queue', '*.nc')))
 
+            if len(ncfiles) == 0:
+                logging.error(' 0 files found to check: {:s}'.format(os.path.join(data_path, 'queue')))
+                status = 1
+                continue
+
             # Iterate through files and find duplicated timestamps
             duplicates = 0
             for i, f in enumerate(ncfiles):

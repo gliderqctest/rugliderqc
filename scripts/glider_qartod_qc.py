@@ -166,6 +166,11 @@ def main(args):
             # List the netcdf files in queue
             ncfiles = sorted(glob.glob(os.path.join(data_path, 'queue', '*.nc')))
 
+            if len(ncfiles) == 0:
+                logging.error(' 0 files found to QC: {:s}'.format(os.path.join(data_path, 'queue')))
+                status = 1
+                continue
+
             # Iterate through files and apply QC
             for f in ncfiles:
                 try:

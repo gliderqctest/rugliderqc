@@ -160,6 +160,11 @@ def main(args):
             # List the netcdf files
             ncfiles = sorted(glob.glob(os.path.join(data_path, 'queue', '*.nc')))
 
+            if len(ncfiles) == 0:
+                logging.error(' 0 files found to QC: {:s}'.format(os.path.join(data_path, 'queue')))
+                status = 1
+                continue
+
             conductivity_varnames = ['conductivity']
 
             # Iterate through the possible conductivity variables
