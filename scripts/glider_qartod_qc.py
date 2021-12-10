@@ -181,6 +181,8 @@ def main(args):
                     status = 1
                     continue
 
+                logging.info('Checking file: {:s}'.format(f))
+
                 # Set the qc configuration path
                 qc_config_root = os.path.join(data_home, 'qc', 'config')
                 if not os.path.isdir(qc_config_root):
@@ -222,7 +224,7 @@ def main(args):
                         sensor = cl.stream_id
                         test = cl.test
                         qc_varname = f'{sensor}_{cl.package}_{test}'
-                        logging.info('Parsing QC results: {:s}'.format(qc_varname))
+                        # logging.info('Parsing QC results: {:s}'.format(qc_varname))
                         flag_results = cl.results.data
 
                         # Defining gross/flatline QC variable attributes
