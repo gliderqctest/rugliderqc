@@ -1,7 +1,9 @@
 from setuptools import setup, find_packages
+from rugliderqc import __version__
 
 setup(
     name='rugliderqc',
+    version=__version__,
     packages=find_packages(),
     url='https://github.com/rucool/slocum-glider-qc',
     author='Laura Nazzaro, Lori Garzio',
