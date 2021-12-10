@@ -161,6 +161,8 @@ def main(args):
             logFile = os.path.join(deployment_location, 'proc-logs', logfilename)
             logging = setup_logger('logging', loglevel, logFile)
 
+            logging.info('Running glider QARTOD QC: {:s}'.format(os.path.join(data_path, 'queue')))
+
             # List the netcdf files in queue
             ncfiles = sorted(glob.glob(os.path.join(data_path, 'queue', '*.nc')))
 

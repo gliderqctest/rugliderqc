@@ -61,7 +61,7 @@ def main(args):
                 p.rename(os.path.join(data_path, p.name))
                 moved += 1
 
-            logging.info('Moved {:} of {:} valid files to: {:s}'.format(moved, len(ncfiles), data_path))
+            logging.info('Moved {:} of {:} valid netcdf files to: {:s}'.format(moved, len(ncfiles), data_path))
 
         return status
 
