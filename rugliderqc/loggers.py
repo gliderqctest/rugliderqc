@@ -20,14 +20,16 @@ def logfile_deploymentname(deployment, dataset_type, cdm_data_type, mode):
 
 
 def setup_logger(name, loglevel, logfile):
-
-    log_format = logging.Formatter('%(asctime)s%(module)s:%(levelname)s:%(message)s [line %(lineno)d]')
-    handler = logging.FileHandler(logfile)
-    handler.setFormatter(log_format)
-
     logger = logging.getLogger(name)
-    log_level = getattr(logging, loglevel)
-    logger.setLevel(log_level)
-    logger.addHandler(handler)
+
+    # if the logger doesn't already exist, set it up
+    if not logger.handlers:
+        log_format = logging.Formatter('%(asctime)s%(module)s:%(levelname)s:%(message)s [line %(lineno)d]')
+        handler = logging.FileHandler(logfile)
+        handler.setFormatter(log_format)
+
+        log_level = getattr(logging, loglevel)
+        logger.setLevel(log_level)
+        logger.addHandler(handler)
 
     return logger
