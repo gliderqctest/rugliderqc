@@ -8,33 +8,32 @@ import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 12})
 
 
-def plot_qartod_flags(axis, dataset, cond_varname):
-    # Iterate through the other QARTOD variables and plot flags
-    colors = ['cyan', 'blue', 'mediumseagreen', 'deeppink', 'purple']
-    flag_defs = dict(suspect=dict(value=3, marker='x'),
-                     fail=dict(value=4, marker='^'))
-    for ci, qv in enumerate([x for x in dataset.data_vars if f'{cond_varname}_qartod' in x]):
-        for fd, info in flag_defs.items():
-            cond_flag = dataset[qv].values
-            qv_idx = np.where(cond_flag == info['value'])[0]
-            if len(qv_idx) > 0:
-                axis.scatter(dataset[cond_varname].values[qv_idx], dataset.pressure.values[qv_idx],
-                             color=colors[ci], s=60, marker=info['marker'], label=f'{qv}-{fd}', zorder=11)
+def define_markers(qc_varname):
+    markers = dict(climatology=dict(m='v', s=60, alpha=1),
+                   hysteresis=dict(m='s', s=40, alpha=1),
+                   flat_line=dict(m='^', s=60, alpha=1),
+                   gross_range=dict(m='D', s=40, alpha=1),
+                   rate_of_change=dict(m='X', s=80, alpha=1),
+                   spike=dict(m='*', s=100, alpha=1),
+                   summary=dict(m='o', s=100, alpha=.5)
+                   )
+    mkey = [key for key in markers.keys() if key in qc_varname][0]
+    return markers[mkey]
 
 
-def main(deploy, fname):
+def main(deploy, fname, nprof):
     glider = deploy.split('-')[0]
 
     ds = xr.open_dataset(fname)
     ds = ds.swap_dims({'row': 'time'})
     ds = ds.sortby(ds.time)
 
-    savedir = os.path.join('/Users/garzio/Documents/rucool/gliders/qartod_qc/from_erddap/plots', deploy)
+    savedir = os.path.join('/Users/garzio/Documents/rucool/gliders/qartod_qc/from_erddap/plots', deploy, f'profiles_group{nprof}')
     os.makedirs(savedir, exist_ok=True)
 
     profiletimes = np.unique(ds.profile_time.values)
 
-    plot_sections = np.arange(0, len(profiletimes), 20)
+    plot_sections = np.arange(0, len(profiletimes), nprof)
     plot_sections = np.append(plot_sections, len(profiletimes))
 
     ctd_vars = ['conductivity', 'temperature', 'salinity', 'density']
@@ -42,8 +41,6 @@ def main(deploy, fname):
     flag_defs = dict(unknown=dict(value=2, color='cyan'),
                      suspect=dict(value=3, color='orange'),
                      fail=dict(value=4, color='red'))
-
-    markers = ['x', '^', 's', '*', 'D']
 
     for ps_idx, ps in enumerate(plot_sections):
         if ps_idx > 0:
@@ -71,15 +68,16 @@ def main(deploy, fname):
                 for pt in ptimes:
                     pt_idx = np.where(dss.profile_time.values == pt)[0]
                     non_nans = np.where(np.invert(np.isnan(pressure[pt_idx])))[0]
-                    ax.plot(data[pt_idx][non_nans], pressure[pt_idx][non_nans], color='k')  # plot lines
+                    ax.plot(data[pt_idx][non_nans], pressure[pt_idx][non_nans], color='gray')  # plot lines
 
                 # add points
-                ax.scatter(data, pressure, color='k', s=20, zorder=5)
+                ax.scatter(data, pressure, color='gray', s=20, zorder=5)
 
                 # find the qc variables
                 qc_vars = [x for x in ds.data_vars if f'{cv}_' in x]
-                if 'conductivity' in cv:
-                    qc_vars.append('instrument_ctd_hysteresis_test')
+                if cv in ['salinity', 'density']:
+                    qc_vars.append('conductivity_hysteresis_test')
+                    qc_vars.append('temperature_hysteresis_test')
 
                 for qi, qv in enumerate(qc_vars):
                     try:
@@ -89,8 +87,9 @@ def main(deploy, fname):
                     for fd, info in flag_defs.items():
                         qc_idx = np.where(flag_vals == info['value'])[0]
                         if len(qc_idx) > 0:
-                            ax.scatter(data[qc_idx], pressure[qc_idx], color=info['color'], s=40,
-                                       marker=markers[qi],
+                            m_defs = define_markers(qv)
+                            ax.scatter(data[qc_idx], pressure[qc_idx], color=info['color'], s=m_defs['s'],
+                                       marker=m_defs['m'], edgecolor='k', alpha=m_defs['alpha'],
                                        label=f'{qv}-{fd}', zorder=10)
 
                 # add legend if necessary
@@ -111,6 +110,7 @@ def main(deploy, fname):
 
 
 if __name__ == '__main__':
-    deployment = 'ru30-20210503T1929'
-    f = '/Users/garzio/Documents/rucool/gliders/qartod_qc/from_erddap/ru30-20210503T1929-profile-sci-rt-qc3.nc'
-    main(deployment, f)
+    deployment = 'maracoos_02-20210716T1814'
+    f = '/Users/garzio/Documents/rucool/gliders/qartod_qc/from_erddap/maracoos_02-20210716T1814-profile-sci-rt-qc.nc'
+    num_profiles = 10
+    main(deployment, f, num_profiles)
